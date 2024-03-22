@@ -22,8 +22,6 @@
 #ifndef BUDDY_H_
 #define BUDDY_H_
 
-#include <stdint.h>
-
 /******************************************************************************
  *
  * Definitions
@@ -39,10 +37,13 @@
 #define BLOCKSIZE(i)    (1 << (i))
 
 /* the address of the buddy of a block from freelists[i]. */
+typedef unsigned long int	uintptr_t;
+typedef unsigned char uint8_t;
+
 #define _MEMBASE        ((uintptr_t)BUDDY->pool)
 #define _OFFSET(b)      ((uintptr_t)b - _MEMBASE)
 #define _BUDDYOF(b, i)  (_OFFSET(b) ^ (1 << (i)))
-#define BUDDYOF(b, i)   ((pointer)( _BUDDYOF(b, i) + _MEMBASE))
+#define BUDDYOF(b, i)   ((pointer*)( _BUDDYOF(b, i) + _MEMBASE))
 
 // not used yet, for higher order memory alignment
 #define ROUND4(x)       ((x % 4) ? (x / 4 + 1) * 4 : x)
@@ -53,15 +54,18 @@
  *
  ******************************************************************************/
 
-typedef void * pointer; /* used for untyped pointers */
+// typedef void * pointer; /* used for untyped pointers */
+typedef struct pointer{
+  struct pointer* next;
+}pointer;
 
 typedef struct buddy {
-  pointer freelist[MAX_ORDER + 2];  // one more slot for first block in pool
+  pointer* freelist[MAX_ORDER + 2];  // one more slot for first block in pool
   uint8_t pool[POOLSIZE];
 } buddy_t;
 
-pointer bmalloc(int size);
-void bfree(pointer block);
+pointer* bmalloc(int size);
+void bfree(pointer* block);
 
 void buddy_init();
 void buddy_deinit();

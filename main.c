@@ -28,8 +28,11 @@ void test001() {
   p2 = bmalloc(13);
 
   bfree(p2);
-  bfree(p1);
+  // bfree(p1);
 
+  p2 = bmalloc(45);
+  p2 = bmalloc(13);
+  p2 = bmalloc(13);
   print_buddy();
 }
 
@@ -62,8 +65,8 @@ int main() {
   buddy_t * buddy = (buddy_t*) malloc(sizeof(buddy_t));
   buddy_init(buddy);
   test001();
-  test002();
-  test003();
+  // test002();
+  // test003();
   buddy_deinit();
   free(buddy);
   return 0;

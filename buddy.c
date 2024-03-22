@@ -27,10 +27,11 @@
 
 buddy_t * BUDDY = 0;
 
-pointer bmalloc(int size) {
+pointer* bmalloc(int size) {
 
   int i, order;
-  pointer block, buddy;
+  pointer* block;
+  pointer* buddy;
 
   // calculate minimal order for this size
   i = 0;
@@ -49,7 +50,7 @@ pointer bmalloc(int size) {
 
   // remove the block out of list
   block = BUDDY->freelist[i];
-  BUDDY->freelist[i] = *(pointer*) BUDDY->freelist[i];
+  BUDDY->freelist[i] = BUDDY->freelist[i] -> next;
 
   // split until i == order
   while (i-- > order) {
@@ -62,11 +63,11 @@ pointer bmalloc(int size) {
   return block;
 }
 
-void bfree(pointer block) {
+void bfree(pointer* block) {
 
   int i;
-  pointer buddy;
-  pointer * p;
+  pointer* buddy;
+  pointer** p;
 
   // fetch order in previous byte
   i = *((uint8_t*) (block - 1));
@@ -78,27 +79,60 @@ void bfree(pointer block) {
 
     // find buddy in list
     while ((*p != NULL) && (*p != buddy))
-      p = (pointer *) *p;
+      p = (pointer **) *p;
 
     // not found, insert into list
     if (*p != buddy) {
-      *(pointer*) block = BUDDY->freelist[i];
+      ((pointer*) block) -> next = BUDDY->freelist[i];
       BUDDY->freelist[i] = block;
       return;
     }
     // found, merged block starts from the lower one
     block = (block < buddy) ? block : buddy;
     // remove buddy out of list
-    *p = *(pointer*) *p;
+    *p = ((pointer*) *p)->next;
   }
 }
 
 void buddy_init(buddy_t * buddy) {
-
   BUDDY = buddy;
   memset(BUDDY, 0, sizeof(buddy_t));
-  BUDDY->freelist[MAX_ORDER] = BUDDY->pool;
+  BUDDY->freelist[MAX_ORDER] = (pointer *)BUDDY->pool;
 }
+
+// Helper function to find the largest power of 2 less than n
+static int find_largest_power_of_two_less_than(int n) {
+  int k = 1;
+  while ((1 << k) < n) k++;
+  return k - 1;
+}
+
+void buddy_init(buddy_t * buddy, int poolsize) {
+  memset(buddy, 0, sizeof(buddy_t) + poolsize); // Adjust the size dynamically based on poolsize
+  int i;
+
+  // Find the largest block size that is less than or equal to POOLSIZE
+  int largest_block_order = find_largest_power_of_two_less_than(poolsize);
+  int largest_block_size = 1 << largest_block_order;
+
+  // Initialize the freelist with the largest block
+  buddy->freelist[largest_block_order] = (pointer *)buddy->pool;
+
+  // Calculate the remaining memory after the largest block is allocated
+  int remaining_memory = poolsize - largest_block_size;
+
+  // Split the remaining memory into smaller blocks and add them to the freelist
+  for (i = largest_block_order - 1; i >= MIN_ORDER && remaining_memory > 0; --i) {
+    int current_block_size = 1 << i;
+    while (remaining_memory >= current_block_size) {
+      pointer* block = (pointer*)((uintptr_t)buddy->pool + poolsize - remaining_memory);
+      block->next = buddy->freelist[i];
+      buddy->freelist[i] = block;
+      remaining_memory -= current_block_size;
+    }
+  }
+}
+
 
 void buddy_deinit() {
 
@@ -112,11 +146,11 @@ void buddy_deinit() {
 static int count_blocks(int i) {
 
   int count = 0;
-  pointer * p = &(BUDDY->freelist[i]);
+  pointer** p = &(BUDDY->freelist[i]);
 
   while (*p != NULL) {
     count++;
-    p = (pointer*) *p;
+    p = (pointer**) *p;
   }
   return count;
 }
@@ -135,10 +169,10 @@ static void print_list(int i) {
 
   printf("freelist[%d]: \n", i);
 
-  pointer *p = &BUDDY->freelist[i];
+  pointer**p = &BUDDY->freelist[i];
   while (*p != NULL) {
     printf("    0x%08lx, 0x%08lx\n", (uintptr_t) *p, (uintptr_t) *p - (uintptr_t) BUDDY->pool);
-    p = (pointer*) *p;
+    p = (pointer**) *p;
   }
 }
 
